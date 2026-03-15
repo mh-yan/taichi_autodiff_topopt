@@ -93,7 +93,7 @@ def _draw_arrows(ax, points, values, scale, cmap, vmin, vmax, title,
 # -----------------------------------------------------------------------
 
 def run_viz(nelx=12, nely=6, n_iters=5, volfrac=0.5, regular=False,
-            out_dir="examples/p2g_g2p_pipeline"):
+            out_dir="examples/p2g_g2p_pipeline", snapshot_every=10):
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -106,7 +106,7 @@ def run_viz(nelx=12, nely=6, n_iters=5, volfrac=0.5, regular=False,
         points = generate_particles_2d(nelx, nely, spacing=0)
     else:
         rng = np.random.default_rng(42)
-        n_pts = int(nelx * nely * 2.5)
+        n_pts = int(nelx * nely * 6)
         points = np.column_stack([
             rng.uniform(0, nelx, n_pts),
             rng.uniform(0, nely, n_pts),
@@ -243,9 +243,11 @@ def run_viz(nelx=12, nely=6, n_iters=5, volfrac=0.5, regular=False,
     x = p2g(x_p, p2e, counts, mesh.n_elem)
     x[~mesh.active_mask] = 0.0
 
-    iters_to_show = list(range(0, n_iters + 1))
+    iters_to_show = [0] + list(range(snapshot_every, n_iters + 1, snapshot_every))
+    if iters_to_show[-1] != n_iters:
+        iters_to_show.append(n_iters)
     n_show = len(iters_to_show)
-    fig_evo, axes_evo = plt.subplots(3, n_show, figsize=(3.5 * n_show, 9), dpi=150)
+    fig_evo, axes_evo = plt.subplots(3, n_show, figsize=(3.2 * n_show, 9), dpi=150)
     for ax in axes_evo.ravel():
         ax.set_xticks([]); ax.set_yticks([])
 
@@ -253,9 +255,10 @@ def run_viz(nelx=12, nely=6, n_iters=5, volfrac=0.5, regular=False,
     for r, label in enumerate(row_labels):
         axes_evo[r, 0].set_ylabel(label, fontsize=9, fontweight="bold")
 
+    pt_size = max(2, min(10, 800.0 / len(points)))
     def _snapshot(col, it_label, x_p_cur, x_phys_cur):
         _draw_particles(axes_evo[0, col], points, x_p_cur, cmap_dens, 0, 1,
-                        f"iter {it_label}", nelx, nely, active_mask, s=8)
+                        f"iter {it_label}", nelx, nely, active_mask, s=pt_size)
         _draw_grid(axes_evo[1, col], nelx, nely, active_mask, x_phys_cur,
                    "gray_r", 0, 1, f"iter {it_label}", show_grid_lines=False)
         topo = np.where(x_phys_cur > 0.5, 1.0, 0.0)
@@ -288,7 +291,7 @@ def run_viz(nelx=12, nely=6, n_iters=5, volfrac=0.5, regular=False,
         x = oc_update(x, dc_it, dv_it, volfrac, mesh, cfg.move, cfg.xmin, beta, cfg.eta)
         x_p = x[p2e]
 
-        if it in iters_to_show[1:]:
+        if it in iters_to_show:
             x_tilde_s = np.zeros_like(x)
             x_tilde_s[mesh.active_ids] = (mesh.H @ x)[mesh.active_ids] / mesh.Hs[mesh.active_ids]
             x_phys_s = np.zeros_like(x)
@@ -395,7 +398,9 @@ if __name__ == "__main__":
     p.add_argument("--nely", type=int, default=6)
     p.add_argument("--iters", type=int, default=5)
     p.add_argument("--volfrac", type=float, default=0.5)
+    p.add_argument("--snapshot-every", type=int, default=10)
     p.add_argument("--regular", action="store_true")
     p.add_argument("--out-dir", default="examples/p2g_g2p_pipeline")
     args = p.parse_args()
-    run_viz(args.nelx, args.nely, args.iters, args.volfrac, args.regular, args.out_dir)
+    run_viz(args.nelx, args.nely, args.iters, args.volfrac, args.regular,
+            args.out_dir, args.snapshot_every)
