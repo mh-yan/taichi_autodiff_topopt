@@ -470,6 +470,99 @@ def interactive_comparison_3d(field_a: np.ndarray, field_b: np.ndarray,
 
 
 # ------------------------------------------------------------------
+# Nonlinear MPM visualisation
+# ------------------------------------------------------------------
+
+def plot_particles_nl(positions: np.ndarray, rho: np.ndarray,
+                      title: str, path: Path,
+                      xlim: tuple = (0, 1), ylim: tuple = (0, 1)):
+    """Plot MPM particles coloured by design density."""
+    plt = _mpl()
+    fig, ax = plt.subplots(figsize=(10, 4), dpi=160)
+    sc = ax.scatter(positions[:, 0], positions[:, 1],
+                    c=rho, cmap="gray_r", vmin=0, vmax=1,
+                    s=4, edgecolors="none")
+    ax.set_xlim(*xlim); ax.set_ylim(*ylim)
+    ax.set_aspect("equal")
+    ax.set_title(title, fontsize=10)
+    ax.set_xlabel("x"); ax.set_ylabel("y")
+    fig.colorbar(sc, ax=ax, fraction=0.03, pad=0.02, label="density")
+    fig.tight_layout(); fig.savefig(path); plt.close(fig)
+
+
+def plot_nl_deformation(init_pos: np.ndarray, deformed_pos: np.ndarray,
+                        rho: np.ndarray, title: str, path: Path,
+                        xlim: tuple = (0, 1), ylim: tuple = (0, 1)):
+    """Show initial (ghost) and deformed (solid) particle configurations."""
+    plt = _mpl()
+    fig, ax = plt.subplots(figsize=(10, 4), dpi=160)
+    ax.scatter(init_pos[:, 0], init_pos[:, 1], c="lightgray",
+               s=2, edgecolors="none", alpha=0.4, label="initial")
+    solid = rho > 0.3
+    sc = ax.scatter(deformed_pos[solid, 0], deformed_pos[solid, 1],
+                    c=rho[solid], cmap="gray_r", vmin=0, vmax=1,
+                    s=5, edgecolors="none", label="deformed")
+    ax.set_xlim(*xlim); ax.set_ylim(*ylim)
+    ax.set_aspect("equal")
+    ax.set_title(title, fontsize=10)
+    ax.set_xlabel("x"); ax.set_ylabel("y")
+    ax.legend(fontsize=8, loc="upper right")
+    fig.colorbar(sc, ax=ax, fraction=0.03, pad=0.02, label="density")
+    fig.tight_layout(); fig.savefig(path); plt.close(fig)
+
+
+def plot_nl_evolution(snapshots: list, path: Path,
+                      xlim: tuple = (0, 1), ylim: tuple = (0, 1)):
+    """Plot topology evolution across design iterations.
+
+    snapshots: list of (iter_num, rho_np, init_pos_np, deformed_pos_np)
+    """
+    plt = _mpl()
+    n = len(snapshots)
+    fig, axes = plt.subplots(2, n, figsize=(3.5 * n, 6), dpi=150)
+    if n == 1:
+        axes = axes.reshape(2, 1)
+    for col, (it, rho, init_p, def_p) in enumerate(snapshots):
+        solid = rho > 0.3
+        axes[0, col].scatter(init_p[solid, 0], init_p[solid, 1],
+                             c=rho[solid], cmap="gray_r", vmin=0, vmax=1,
+                             s=3, edgecolors="none")
+        axes[0, col].set_xlim(*xlim); axes[0, col].set_ylim(*ylim)
+        axes[0, col].set_aspect("equal")
+        axes[0, col].set_title(f"iter {it} (undeformed)", fontsize=8)
+
+        axes[1, col].scatter(def_p[solid, 0], def_p[solid, 1],
+                             c=rho[solid], cmap="gray_r", vmin=0, vmax=1,
+                             s=3, edgecolors="none")
+        axes[1, col].set_xlim(*xlim); axes[1, col].set_ylim(*ylim)
+        axes[1, col].set_aspect("equal")
+        axes[1, col].set_title(f"iter {it} (deformed)", fontsize=8)
+    for ax in axes.ravel():
+        ax.set_xticks([]); ax.set_yticks([])
+    axes[0, 0].set_ylabel("Undeformed", fontsize=9, fontweight="bold")
+    axes[1, 0].set_ylabel("Deformed", fontsize=9, fontweight="bold")
+    fig.suptitle("Nonlinear MPM Topology Evolution", fontsize=12, fontweight="bold")
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.savefig(path); plt.close(fig)
+
+
+def plot_nl_history(hist: np.ndarray, path: Path):
+    """Plot design iteration history: loss, volume, tip_y."""
+    plt = _mpl()
+    fig, axes = plt.subplots(3, 1, figsize=(8, 7), dpi=150, sharex=True)
+    axes[0].plot(hist[:, 0], hist[:, 1], "b-", lw=1.5)
+    axes[0].set_ylabel("loss (neg tip_y)"); axes[0].grid(True, alpha=0.3)
+    axes[1].plot(hist[:, 0], hist[:, 2], "g-", lw=1.5)
+    axes[1].set_ylabel("volume fraction"); axes[1].grid(True, alpha=0.3)
+    axes[2].plot(hist[:, 0], hist[:, 3], "r-", lw=1.5)
+    axes[2].set_ylabel("tip y position"); axes[2].grid(True, alpha=0.3)
+    axes[2].set_xlabel("design iteration")
+    fig.suptitle("Nonlinear MPM Optimization History", fontweight="bold")
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    fig.savefig(path); plt.close(fig)
+
+
+# ------------------------------------------------------------------
 # Similarity metrics
 # ------------------------------------------------------------------
 

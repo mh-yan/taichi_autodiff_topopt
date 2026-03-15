@@ -38,6 +38,18 @@ class TopOptConfig:
     stress_constraint: bool = False
     sigma_allow: float = 1.0
     stress_pnorm: int = 8
+    # nonlinear MPM parameters
+    nl_dt: float = 1e-4
+    nl_steps: int = 256
+    nl_n_grid: int = 64
+    nl_gravity: float = 9.8
+    nl_E: float = 500.0
+    nl_ppd: int = 2
+    nl_beam_x0: float = 0.05
+    nl_beam_y0: float = 0.4
+    nl_beam_w: float = 0.55
+    nl_beam_h: float = 0.15
+    nl_design_iters: int = 60
 
     @property
     def nel(self):
