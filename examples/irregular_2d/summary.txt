@@ -1,0 +1,16 @@
+dim: 2
+grid: 60x20
+particles: 2683
+active_elements: 1159
+mpm_final_compliance: 193.39517972673525
+mpm_final_volume: 0.5000000632132087
+ref_final_compliance: 182.39685564846172
+ref_final_volume: 0.4999997414554816
+corr: 0.3154716869534711
+rmse: 0.5758003464150747
+iou@0.5: 0.48333333333333334
+dice@0.5: 0.651685393258427
+active_binary_mpm: 578
+active_binary_ref: 579
+matches_simp: False
+gif: not requested

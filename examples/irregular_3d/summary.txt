@@ -1,0 +1,16 @@
+dim: 3
+grid: 30x10x6
+particles: 9323
+active_elements: 1800
+mpm_final_compliance: 43.579199906482025
+mpm_final_volume: 0.2999999728979465
+ref_final_compliance: 46.05497471431519
+ref_final_volume: 0.2999988996192047
+corr: 0.3710203951112878
+rmse: 0.49836346317512986
+iou@0.5: 0.3762755102040816
+dice@0.5: 0.5468025949953661
+active_binary_mpm: 537
+active_binary_ref: 542
+matches_simp: False
+gif: not requested
