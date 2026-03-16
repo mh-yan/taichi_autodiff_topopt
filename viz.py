@@ -95,53 +95,52 @@ def plot_comparison_2d(field_a: np.ndarray, field_b: np.ndarray,
 # 3D
 # ------------------------------------------------------------------
 
+
 def _draw_bc_3d(ax, fixed_nodes, load_nodes, F, nely, nelz, dpn=3):
     """Draw boundary condition markers on a 3D axes."""
-    nxy = (nely + 1)  # stride per x-increment in node_id
-    nplane = (nely + 1) * ((nelz + 1) if dpn == 3 else 1)
-    # For 3D: node_id = iz * (nelx+1)*(nely+1) + ix * (nely+1) + iy
-    full_nxy = nxy  # (nely+1)
-    full_nplane = 0  # computed below
-    # Decode node coords
-    def _node_pos_3d(nid):
-        nxy_full = (nely + 1)
-        # Total nodes per z-layer
-        # node_id = iz * (nelx+1)*(nely+1) + ix*(nely+1) + iy
-        # We don't know nelx here but we can estimate from fixed_nodes range
-        nxy_plane = max(nid + 1, 1)  # will be overridden
-        return nid  # placeholder
-
-    # Better: use F length to get nelx
-    n_nodes = len(F) // dpn
     nely1 = nely + 1
+    n_nodes = len(F) // dpn
     nelz1 = nelz + 1
-    nelx1 = n_nodes // (nely1 * nelz1)
-    nxy_plane = nelx1 * nely1
+    nxy = n_nodes // nelz1  # (nelx+1)*(nely+1)
 
-    seen = set()
+    def _decode(nid):
+        iz = nid // nxy
+        rem = nid % nxy
+        ix = rem // nely1
+        iy = rem % nely1
+        return ix, iy, iz
+
+    # Fixed supports: only draw a sparse subset to avoid clutter
+    fixed_coords = set()
     for n in fixed_nodes:
-        iz = n // nxy_plane
-        rem = n % nxy_plane
-        ix = rem // nely1
-        iy = rem % nely1
-        key = (ix, iy, iz)
-        if key in seen:
-            continue
-        seen.add(key)
-        ax.scatter([ix], [iy], [iz], marker="<", c="#2563EB", s=18,
-                   edgecolors="white", linewidths=0.3, zorder=5)
+        fixed_coords.add(_decode(int(n)))
+    if len(fixed_coords) > 0:
+        fc = np.array(list(fixed_coords))
+        # Sub-sample if too many
+        if len(fc) > 60:
+            step = max(1, len(fc) // 40)
+            fc = fc[::step]
+        ax.scatter(fc[:, 0], fc[:, 1], fc[:, 2],
+                   marker="s", c="#2563EB", s=25, alpha=0.7,
+                   edgecolors="white", linewidths=0.3,
+                   zorder=5, label="Fixed BC")
 
+    # Load arrows
     for ln in load_nodes:
-        iz = ln // nxy_plane
-        rem = ln % nxy_plane
-        ix = rem // nely1
-        iy = rem % nely1
-        fy = F[dpn * ln + 1] if dpn * ln + 1 < len(F) else 0
-        fx = F[dpn * ln] if dpn * ln < len(F) else 0
-        fz = F[dpn * ln + 2] if dpn * ln + 2 < len(F) else 0
-        s = 3.0
-        ax.quiver(ix, iy, iz, fx * s, fy * s, fz * s,
-                  color="#DC2626", arrow_length_ratio=0.3, linewidth=2, zorder=5)
+        ix, iy, iz = _decode(int(ln))
+        fx_v = float(F[dpn * ln]) if dpn * ln < len(F) else 0
+        fy_v = float(F[dpn * ln + 1]) if dpn * ln + 1 < len(F) else 0
+        fz_v = float(F[dpn * ln + 2]) if dpn * ln + 2 < len(F) else 0
+        s = 5.0
+        ax.quiver(ix, iy, iz, fx_v * s, fy_v * s, fz_v * s,
+                  color="#DC2626", arrow_length_ratio=0.25,
+                  linewidth=2.5, zorder=6)
+    if len(load_nodes) > 0:
+        lc = np.array([_decode(int(ln)) for ln in load_nodes])
+        ax.scatter(lc[:, 0], lc[:, 1], lc[:, 2],
+                   marker="o", c="#DC2626", s=40,
+                   edgecolors="white", linewidths=0.5,
+                   zorder=6, label="Load BC")
 
 
 def plot_density_3d(field: np.ndarray, nelx: int, nely: int, nelz: int,
@@ -156,16 +155,20 @@ def plot_density_3d(field: np.ndarray, nelx: int, nely: int, nelz: int,
         for iy in range(nely):
             for iz in range(nelz):
                 if voxels[ix, iy, iz]:
-                    v = flat[ix, iy, iz]
-                    colors[ix, iy, iz] = (0.2, 0.2, 0.2, float(np.clip(v, 0.3, 1.0)))
-    fig = plt.figure(figsize=(9, 7), dpi=120)
+                    v = float(np.clip(flat[ix, iy, iz], 0.0, 1.0))
+                    gray = 1.0 - v * 0.85
+                    colors[ix, iy, iz] = (gray, gray, gray, 0.9)
+    fig = plt.figure(figsize=(10, 7), dpi=140)
     ax = fig.add_subplot(111, projection="3d")
-    ax.voxels(voxels, facecolors=colors, edgecolor=(0.5, 0.5, 0.5, 0.1))
+    ax.voxels(voxels, facecolors=colors,
+              edgecolor=(0.3, 0.3, 0.3, 0.15))
     if show_bc and bc is not None:
         _draw_bc_3d(ax, bc["fixed_nodes"], bc["load_nodes"], bc["F"],
                     nely, nelz, dpn=3)
+        ax.legend(loc="upper left", fontsize=7, framealpha=0.7)
     ax.set_xlabel("x"); ax.set_ylabel("y"); ax.set_zlabel("z")
     ax.set_title(title)
+    ax.view_init(elev=25, azim=-60)
     fig.tight_layout(); fig.savefig(path); plt.close(fig)
 
 
@@ -468,98 +471,6 @@ def interactive_comparison_3d(field_a: np.ndarray, field_b: np.ndarray,
     fig.show()
     return fig
 
-
-# ------------------------------------------------------------------
-# Nonlinear MPM visualisation
-# ------------------------------------------------------------------
-
-def plot_particles_nl(positions: np.ndarray, rho: np.ndarray,
-                      title: str, path: Path,
-                      xlim: tuple = (0, 1), ylim: tuple = (0, 1)):
-    """Plot MPM particles coloured by design density."""
-    plt = _mpl()
-    fig, ax = plt.subplots(figsize=(10, 4), dpi=160)
-    sc = ax.scatter(positions[:, 0], positions[:, 1],
-                    c=rho, cmap="gray_r", vmin=0, vmax=1,
-                    s=4, edgecolors="none")
-    ax.set_xlim(*xlim); ax.set_ylim(*ylim)
-    ax.set_aspect("equal")
-    ax.set_title(title, fontsize=10)
-    ax.set_xlabel("x"); ax.set_ylabel("y")
-    fig.colorbar(sc, ax=ax, fraction=0.03, pad=0.02, label="density")
-    fig.tight_layout(); fig.savefig(path); plt.close(fig)
-
-
-def plot_nl_deformation(init_pos: np.ndarray, deformed_pos: np.ndarray,
-                        rho: np.ndarray, title: str, path: Path,
-                        xlim: tuple = (0, 1), ylim: tuple = (0, 1)):
-    """Show initial (ghost) and deformed (solid) particle configurations."""
-    plt = _mpl()
-    fig, ax = plt.subplots(figsize=(10, 4), dpi=160)
-    ax.scatter(init_pos[:, 0], init_pos[:, 1], c="lightgray",
-               s=2, edgecolors="none", alpha=0.4, label="initial")
-    solid = rho > 0.3
-    sc = ax.scatter(deformed_pos[solid, 0], deformed_pos[solid, 1],
-                    c=rho[solid], cmap="gray_r", vmin=0, vmax=1,
-                    s=5, edgecolors="none", label="deformed")
-    ax.set_xlim(*xlim); ax.set_ylim(*ylim)
-    ax.set_aspect("equal")
-    ax.set_title(title, fontsize=10)
-    ax.set_xlabel("x"); ax.set_ylabel("y")
-    ax.legend(fontsize=8, loc="upper right")
-    fig.colorbar(sc, ax=ax, fraction=0.03, pad=0.02, label="density")
-    fig.tight_layout(); fig.savefig(path); plt.close(fig)
-
-
-def plot_nl_evolution(snapshots: list, path: Path,
-                      xlim: tuple = (0, 1), ylim: tuple = (0, 1)):
-    """Plot topology evolution across design iterations.
-
-    snapshots: list of (iter_num, rho_np, init_pos_np, deformed_pos_np)
-    """
-    plt = _mpl()
-    n = len(snapshots)
-    fig, axes = plt.subplots(2, n, figsize=(3.5 * n, 6), dpi=150)
-    if n == 1:
-        axes = axes.reshape(2, 1)
-    for col, (it, rho, init_p, def_p) in enumerate(snapshots):
-        solid = rho > 0.3
-        axes[0, col].scatter(init_p[solid, 0], init_p[solid, 1],
-                             c=rho[solid], cmap="gray_r", vmin=0, vmax=1,
-                             s=3, edgecolors="none")
-        axes[0, col].set_xlim(*xlim); axes[0, col].set_ylim(*ylim)
-        axes[0, col].set_aspect("equal")
-        axes[0, col].set_title(f"iter {it} (undeformed)", fontsize=8)
-
-        axes[1, col].scatter(def_p[solid, 0], def_p[solid, 1],
-                             c=rho[solid], cmap="gray_r", vmin=0, vmax=1,
-                             s=3, edgecolors="none")
-        axes[1, col].set_xlim(*xlim); axes[1, col].set_ylim(*ylim)
-        axes[1, col].set_aspect("equal")
-        axes[1, col].set_title(f"iter {it} (deformed)", fontsize=8)
-    for ax in axes.ravel():
-        ax.set_xticks([]); ax.set_yticks([])
-    axes[0, 0].set_ylabel("Undeformed", fontsize=9, fontweight="bold")
-    axes[1, 0].set_ylabel("Deformed", fontsize=9, fontweight="bold")
-    fig.suptitle("Nonlinear MPM Topology Evolution", fontsize=12, fontweight="bold")
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-    fig.savefig(path); plt.close(fig)
-
-
-def plot_nl_history(hist: np.ndarray, path: Path):
-    """Plot design iteration history: loss, volume, tip_y."""
-    plt = _mpl()
-    fig, axes = plt.subplots(3, 1, figsize=(8, 7), dpi=150, sharex=True)
-    axes[0].plot(hist[:, 0], hist[:, 1], "b-", lw=1.5)
-    axes[0].set_ylabel("loss (neg tip_y)"); axes[0].grid(True, alpha=0.3)
-    axes[1].plot(hist[:, 0], hist[:, 2], "g-", lw=1.5)
-    axes[1].set_ylabel("volume fraction"); axes[1].grid(True, alpha=0.3)
-    axes[2].plot(hist[:, 0], hist[:, 3], "r-", lw=1.5)
-    axes[2].set_ylabel("tip y position"); axes[2].grid(True, alpha=0.3)
-    axes[2].set_xlabel("design iteration")
-    fig.suptitle("Nonlinear MPM Optimization History", fontweight="bold")
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-    fig.savefig(path); plt.close(fig)
 
 
 # ------------------------------------------------------------------
