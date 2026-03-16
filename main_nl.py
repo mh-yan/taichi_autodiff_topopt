@@ -13,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
-from engine_nl_jax import NLConfig, NLEngine
+from engine_nl_jax import NLConfig, NLEngine, generate_irregular_cloud
 from viz import (plot_particles_nl, plot_nl_deformation,
                  plot_nl_evolution, plot_nl_history)
 
